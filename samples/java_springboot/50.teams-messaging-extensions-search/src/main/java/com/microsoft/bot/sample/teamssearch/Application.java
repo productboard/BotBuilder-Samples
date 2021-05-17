@@ -13,6 +13,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.web.filter.CommonsRequestLoggingFilter;
+
+import javax.servlet.Filter;
 
 //
 // This is the starting point of the Sprint Boot Bot application.
@@ -60,5 +63,12 @@ public class Application extends BotDependencyConfiguration {
     @Override
     public BotFrameworkHttpAdapter getBotFrameworkHttpAdaptor(Configuration configuration) {
         return new AdapterWithErrorHandler(configuration);
+    }
+
+    @Bean
+    public Filter requestLoggingFilter() {
+        CommonsRequestLoggingFilter filter = new CommonsRequestLoggingFilter();
+        filter.setIncludePayload(true);
+        return filter;
     }
 }
