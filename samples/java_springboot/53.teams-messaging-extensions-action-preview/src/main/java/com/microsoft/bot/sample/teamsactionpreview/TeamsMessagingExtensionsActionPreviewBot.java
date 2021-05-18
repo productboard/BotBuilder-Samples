@@ -11,8 +11,10 @@ import com.microsoft.bot.builder.teams.TeamsActivityHandler;
 import com.microsoft.bot.sample.teamsactionpreview.models.AdaptiveCard;
 import com.microsoft.bot.sample.teamsactionpreview.models.Body;
 import com.microsoft.bot.sample.teamsactionpreview.models.Choice;
+import com.microsoft.bot.schema.ActionTypes;
 import com.microsoft.bot.schema.Activity;
 import com.microsoft.bot.schema.Attachment;
+import com.microsoft.bot.schema.CardAction;
 import com.microsoft.bot.schema.teams.*;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.LoggerFactory;
@@ -22,7 +24,9 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -34,6 +38,43 @@ import java.util.stream.Collectors;
  * </p>
  */
 public class TeamsMessagingExtensionsActionPreviewBot extends TeamsActivityHandler {
+    private final Map<String, String> userIdToName = new ConcurrentHashMap<>();
+
+    private CompletableFuture<MessagingExtensionActionResponse> requestAuth() {
+        CardAction cardAction = new CardAction();
+        cardAction.setType(ActionTypes.OPEN_URL);
+        cardAction.setValue("https://186e3a27e70b.ngrok.io/login.html");
+        cardAction.setTitle("Sign-in to Productboard");
+
+        MessagingExtensionSuggestedAction suggestedAction = new MessagingExtensionSuggestedAction();
+        suggestedAction.setAction(cardAction);
+
+        MessagingExtensionResult composeExtension = new MessagingExtensionResult();
+        composeExtension.setType("auth");
+        composeExtension.setSuggestedActions(suggestedAction);
+
+        MessagingExtensionActionResponse response = new MessagingExtensionActionResponse();
+        response.setComposeExtension(composeExtension);
+        return CompletableFuture.completedFuture(response);
+    }
+
+    private String getUserName(TurnContext turnContext) {
+        String userId = getUserId(turnContext);
+        maybeProcessLogIn(turnContext, userId);
+        return userId != null ? userIdToName.get(userId) : null;
+    }
+
+    private void maybeProcessLogIn(TurnContext turnContext, String userId) {
+        if (userId == null) return;
+        String state = ((Map<String, String>) turnContext.getActivity().getValue()).get("state");
+        if (state != null) {
+            userIdToName.put(userId, state);
+        }
+    }
+
+    private String getUserId(TurnContext turnContext) {
+        return turnContext.getActivity().getFrom().getId();
+    }
 
     @Override
     protected CompletableFuture<Void> onMessageActivity(
@@ -62,13 +103,19 @@ public class TeamsMessagingExtensionsActionPreviewBot extends TeamsActivityHandl
         TurnContext turnContext,
         MessagingExtensionAction action) {
 
+        String userName = getUserName(turnContext);
+
+        if (userName == null) {
+            return requestAuth();
+        }
+
         Attachment adaptiveCardEditor = getAdaptiveCardAttachment("adaptiveCardEditor.json");
 
         TaskModuleTaskInfo taskInfo = new TaskModuleTaskInfo();
         taskInfo.setCard(adaptiveCardEditor);
         taskInfo.setWidth(500);
         taskInfo.setHeight(450);
-        taskInfo.setTitle("Task Module Fetch Example");
+        taskInfo.setTitle("Task Module Fetch Example for " + userName);
 
         TaskModuleContinueResponse continueResponse = new TaskModuleContinueResponse();
         continueResponse.setValue(taskInfo);
