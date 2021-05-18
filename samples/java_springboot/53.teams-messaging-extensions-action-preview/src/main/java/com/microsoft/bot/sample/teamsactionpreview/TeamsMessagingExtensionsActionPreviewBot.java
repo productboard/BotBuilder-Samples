@@ -15,6 +15,7 @@ import com.microsoft.bot.schema.ActionTypes;
 import com.microsoft.bot.schema.Activity;
 import com.microsoft.bot.schema.Attachment;
 import com.microsoft.bot.schema.CardAction;
+import com.microsoft.bot.schema.ThumbnailCard;
 import com.microsoft.bot.schema.teams.*;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -132,17 +134,29 @@ public class TeamsMessagingExtensionsActionPreviewBot extends TeamsActivityHandl
         TurnContext turnContext,
         MessagingExtensionAction action) {
 
-        Attachment adaptiveCard = getAdaptiveCardAttachment("submitCard.json");
+        String userName = getUserName(turnContext);
 
-        updateAttachmentAdaptiveCard(adaptiveCard, action);
+        if (userName == null) {
+            return requestAuth();
+        }
 
-        MessagingExtensionResult result = new MessagingExtensionResult();
-        result.setType("botMessagePreview");
-        result.setActivityPreview(MessageFactory.attachment(adaptiveCard));
+        return loggedInMessage(userName);
+    }
 
+    private CompletableFuture<MessagingExtensionActionResponse> loggedInMessage(String userName) {
+        ThumbnailCard card = new ThumbnailCard();
+        card.setTitle("Insight added by " + userName);
+
+        MessagingExtensionAttachment attachment = new MessagingExtensionAttachment();
+        attachment.setContentType(ThumbnailCard.CONTENTTYPE);
+        attachment.setContent(card);
+
+        MessagingExtensionResult composeExtension = new MessagingExtensionResult();
+        composeExtension.setType("result");
+        composeExtension.setAttachmentLayout("list");
+        composeExtension.setAttachments(Collections.singletonList(attachment));
         MessagingExtensionActionResponse response = new MessagingExtensionActionResponse();
-        response.setComposeExtension(result);
-
+        response.setComposeExtension(composeExtension);
         return CompletableFuture.completedFuture(response);
     }
 
